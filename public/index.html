@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FOMO3D Prize Wheel Faucet</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+      background-color: #121212;
+      color: #f0f0f0;
+    }
+
+    #wheel {
+      border: 5px solid #848484;
+      border-radius: 50%;
+      background-color: #1e1e1e;
+      width: 80vw;  /* 80% of viewport width */
+      max-width: 400px;
+      height: auto; /* maintain aspect ratio */
+    }
+
+    #spinBtn {
+      padding: 12px 24px;
+      font-size: 20px;
+      margin-top: 20px;
+      background-color: #7322ff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    #spinBtn:hover {
+      background-color: #9e52e0;
+    }
+
+    #wallet {
+      padding: 12px 10px;
+      font-size: 18px;
+      border-radius: 6px;
+      border: 1px solid #555;
+      background-color: #1e1e1e;
+      color: #f0f0f0;
+      margin-top: 20px;
+      outline: none;
+      width: 90%;
+      max-width: 420px;
+    }
+
+    #wallet::placeholder {
+      color: #888;
+    }
+
+    #result {
+      font-size: 22px;
+      margin-top: 20px;
+      font-weight: bold;
+      color: #ffcc00;
+    }
+
+    a {
+      color: #4fc3f7;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>FOMO3D Prize Wheel Faucet</h1>
+  <canvas id="wheel" width="400" height="400"></canvas>
+  <br>
+  <br>
+  <input type="text" id="wallet" placeholder="Enter your wallet address" size="42">
+  <br>
+  <button id="spinBtn">Spin the Wheel!</button>
+  <div id="result"></div>
+
+  <script>
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const spinBtn = document.getElementById("spinBtn");
+    const resultDiv = document.getElementById("result");
+    const walletInput = document.getElementById("wallet");
+
+    const prizes = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1];
+    const weights = [20, 20, 10, 10, 10, 5, 5];
+    const colors = [
+        "#FFADAD", // light red
+        "#FFD6A5", // light orange
+        "#FDFFB6", // soft yellow
+        "#CAFFBF", // soft green
+        "#9BF6FF", // soft cyan
+        "#A0C4FF", // soft blue
+        "#BDB2FF"  // soft purple
+    ];
+
+    function getWedges() {
+        const wedges = [];
+        const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+        let start = 0;
+
+        for (let i = 0; i < prizes.length; i++) {
+            const angle = (weights[i] / totalWeight) * (2 * Math.PI);
+            wedges.push({
+                prize: prizes[i],
+                startAngle: start,
+                endAngle: start + angle
+            });
+            start += angle;
+        }
+
+        return wedges;
+    }
+
+    function findWedgeByPrize(prize) {
+        const wedges = getWedges();
+        return wedges.find(w => w.prize === prize);
+    }
+
+    function drawWheel(angle=0) {
+        const totalWeight = weights.reduce((a, b) => a + b, 0);
+        let startAngle = angle;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < prizes.length; i++) {
+            const wedgeAngle = (weights[i] / totalWeight) * (2 * Math.PI);
+            const endAngle = startAngle + wedgeAngle;
+
+            // Draw wedge
+            ctx.beginPath();
+            ctx.moveTo(200, 200);
+            ctx.fillStyle = colors[i];
+            ctx.arc(200, 200, 200, startAngle, endAngle);
+            ctx.fill();
+
+            // Draw label
+            ctx.save();
+            ctx.translate(200, 200);
+            ctx.rotate(startAngle + wedgeAngle / 2);
+            ctx.fillStyle = "#000";
+            ctx.font = "20px Arial";
+            ctx.fillText(prizes[i], 120, 10);
+            ctx.restore();
+
+            startAngle = endAngle;
+        }
+
+        // Draw pointer on the right side
+        ctx.beginPath();
+        ctx.fillStyle = "#444";
+        ctx.moveTo(360, 200);    // tip of the pointer (right side)
+        ctx.lineTo(400, 185);    // upper left point
+        ctx.lineTo(400, 215);    // lower left point
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    let spinning = false;
+
+    spinBtn.onclick = async () => {
+        if (spinning) return;
+        const wallet = walletInput.value.trim();
+        
+        if (!wallet) {
+            alert("Enter your wallet address");
+            return;
+        }
+
+        spinning = true;
+        resultDiv.innerText="Spinning...";
+
+        const response = await fetch("/faucet", {
+            method:"POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({wallet})
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            resultDiv.innerText = data.error;
+            spinning = false;
+            return;
+        }
+
+        let prize = data.amount;
+        const wedge = findWedgeByPrize(prize);
+
+        // Pick random point inside wedge
+        const targetAngleInsideWedge =
+            wedge.startAngle + Math.random() * (wedge.endAngle - wedge.startAngle);
+
+        // Wheel spins several full turns before landing
+        const targetAngle = (Math.PI * -10) + (2 * Math.PI - targetAngleInsideWedge);
+
+        let currentAngle = 0;
+        let duration = 10000;
+        let start = null;
+
+        function animate(timestamp) {
+            if (!start) start = timestamp;
+            let progress = timestamp - start;
+            let angle = currentAngle + (targetAngle - currentAngle) * easeOutCubic(progress / duration);
+            drawWheel(angle);
+
+            if (progress < duration) {
+                requestAnimationFrame(animate);
+            } else {
+                drawWheel(targetAngle);
+                resultDiv.innerHTML = `
+                    🎉 You won <strong>${prize} FOMO3D</strong>!<br>
+                    <a href="https://bscscan.com/tx/${data.txHash}" target="_blank">
+                        View Transaction on BscScan
+                    </a>
+                `;
+                spinning = false;
+            }
+        }
+
+        requestAnimationFrame(animate);
+    }
+
+    function easeOutCubic(t) {
+        return (--t) * t * t + 1;
+    }
+
+    drawWheel();
+  </script>
+</body>
+</html>
