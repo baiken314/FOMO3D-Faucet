@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/favicon.png" type="image/png">
   <title>FOMO3D Prize Wheel Faucet</title>
   <style>
     body {
@@ -148,7 +149,7 @@
             ctx.rotate(startAngle + wedgeAngle / 2);
             ctx.fillStyle = "#000";
             ctx.font = "20px Arial";
-            ctx.fillText(prizes[i], 120, 10);
+            ctx.fillText("ⴵ" + prizes[i].toString(), 120, 10);
             ctx.restore();
 
             startAngle = endAngle;
@@ -217,7 +218,7 @@
             } else {
                 drawWheel(targetAngle);
                 resultDiv.innerHTML = `
-                    🎉 You won <strong>${prize} FOMO3D</strong>!<br>
+                    🎉 You won <strong>ⴵ${prize} FOMO3D</strong>!<br>
                     <a href="https://bscscan.com/tx/${data.txHash}" target="_blank">
                         View Transaction on BscScan
                     </a>

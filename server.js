@@ -48,23 +48,27 @@ app.post("/faucet", async (req, res) => {
     const ip = req.ip;
     const userWalletAddress = req.body.wallet;
 
+    console.log("Faucet request from", ip);
+
     if (!ethers.isAddress(userWalletAddress)) {
         console.log("Invalid wallet address");
         return res.status(400).json({ error: "Invalid wallet address" });
     }
 
     const lastRequest = await FaucetRequests.findOne({ ip });
-    const cooldown = 60 * 60 * 1000; // 10 minutes in ms
+    const cooldown = 24 * 60 * 60 * 1000; 
     const now = Date.now();
 
     if (lastRequest && now - lastRequest.time < cooldown && userWalletAddress != process.env.MY_ADDRESS) {
         const remaining = cooldown - (now - lastRequest.time);
 
-        const minutes = Math.floor(remaining / 60000);
-        const seconds = Math.floor((remaining % 60000) / 1000);
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
 
         return res.status(429).json({
-            error: `Please wait ${minutes}m ${seconds}s before claiming again.`,
+            error: `Please wait ${hours}h ${minutes}m ${seconds}s before claiming again.`,
+            hours,
             minutes,
             seconds
         });
